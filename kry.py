@@ -1,3 +1,7 @@
+""" Implementation of hybrid cryptosystem. VUT FIT Cryptography project.
+    Author: Tereza Burianova (xburia28)
+    Date: 30-04-2023
+"""
 import os
 import sys
 import hashlib
@@ -13,7 +17,10 @@ def get_args():
     group = parser.add_mutually_exclusive_group(required=True)
     group.add_argument('-c', action='store_true')
     group.add_argument('-s', action='store_true')
-    args = parser.parse_args()
+    try:
+        args = parser.parse_args()
+    except:
+        sys.exit("Error: arguments parsing.")
     return args
 
 def padding(data):
@@ -22,9 +29,14 @@ def padding(data):
     data -- data to be encrypted without padding
     """
     padding_len = 256 - len(data)
-    padding = os.urandom(padding_len - 3)
-    padding.replace(b'0', b'9')
-    padding = b'0' + b'0' + padding + b'0'
+    if (padding_len < 0):
+        sys.exit("Error: data too long.")
+    if (padding_len >= 3):
+        padding = os.urandom(padding_len - 3)
+        padding.replace(b'0', b'9')
+        padding = b'0' + b'0' + padding + b'0'
+    else:
+        padding = b'0' * padding_len
     return padding + data
 
 def RSA_encrypt(data, key, sign):
@@ -56,21 +68,24 @@ def RSA_decrypt(data, key, sign):
 
 args = get_args()
 if (args.c): ## Client
-    sck = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    sck.settimeout(600)
     try:
+        sck = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sck.settimeout(600)
         sck.connect(("localhost", args.port))
     except socket.error:
         sys.exit("Error connecting to the server: {}.".format(socket.error))
     print("\nc: Successfully connected to server")
 
     ## RSA keys
-    f_cpr = open('./cert/client_private.pem','r')
-    key_cpr = RSA.import_key(f_cpr.read())
-    f_cpu = open('./cert/client_public.pem','r')
-    key_cpu = RSA.import_key(f_cpu.read())
-    f_spu = open('./cert/server_public.pem','r')
-    key_spu = RSA.import_key(f_spu.read())
+    try:
+        f_cpr = open('./cert/client_private.pem','r')
+        key_cpr = RSA.import_key(f_cpr.read())
+        f_cpu = open('./cert/client_public.pem','r')
+        key_cpu = RSA.import_key(f_cpu.read())
+        f_spu = open('./cert/server_public.pem','r')
+        key_spu = RSA.import_key(f_spu.read())
+    except:
+        sys.exit("Error importing RSA keys.")
     print("\nc: RSA_public_key_sender={}".format(key_cpu.export_key()))
     print("\nc: RSA_private_key_sender={}".format(key_cpr.export_key()))
     print("\nc: RSA_public_key_receiver={}".format(key_spu.export_key()))
@@ -104,10 +119,13 @@ if (args.c): ## Client
         print("\nc: ciphertext={}".format(msg))
         ## Send message
         while True:
-            sck.send(len(msg).to_bytes(2, 'big', signed=False))
-            sck.sendall(msg)
-            res = sck.recv(2)
-            res = int.from_bytes(res, 'big')
+            try:
+                sck.send(len(msg).to_bytes(2, 'big', signed=False))
+                sck.sendall(msg)
+                res = sck.recv(2)
+                res = int.from_bytes(res, 'big')
+            except:
+                sys.exit("Error in connection to server.")
             if res == 1:
                 print("The message was successfully delivered.")
                 break
@@ -115,26 +133,35 @@ if (args.c): ## Client
                 print("The message was sent again.")
 elif args.s: ## Server
     ## Listen for a client
-    sck = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    sck.bind(("localhost", args.port))
-    sck.listen(1)
-    conn, address = sck.accept()
+    try:
+        sck = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sck.bind(("localhost", args.port))
+        sck.listen(1)
+        conn, address = sck.accept()
+    except:
+        sys.exit("Error connecting to client.")
     print("\ns: Client has joined")
     ## RSA keys
-    f_spr = open('./cert/server_private.pem','r')
-    key_spr = RSA.import_key(f_spr.read())
-    f_spu = open('./cert/server_public.pem','r')
-    key_spu = RSA.import_key(f_spu.read())
-    f_cpu = open('./cert/client_public.pem','r')
-    key_cpu = RSA.import_key(f_cpu.read())
+    try:
+        f_spr = open('./cert/server_private.pem','r')
+        key_spr = RSA.import_key(f_spr.read())
+        f_spu = open('./cert/server_public.pem','r')
+        key_spu = RSA.import_key(f_spu.read())
+        f_cpu = open('./cert/client_public.pem','r')
+        key_cpu = RSA.import_key(f_cpu.read())
+    except:
+        sys.exit("Error importing RSA keys.")
     print("\ns: RSA_public_key_receiver={}".format(key_spu.export_key()))
     print("\ns: RSA_private_key_receiver={}".format(key_spr.export_key()))
     print("\ns: RSA_public_key_sender={}".format(key_cpu.export_key()))
     while True:
         ## Get data
-        msg_len = conn.recv(2)
-        msg_len = int.from_bytes(msg_len, 'big')
-        msg = conn.recv(4096)
+        try:
+            msg_len = conn.recv(2)
+            msg_len = int.from_bytes(msg_len, 'big')
+            msg = conn.recv(4096)
+        except:
+            sys.exit("Error in connection to client.")
         if msg_len != len(msg):
             print("\ns: The integrity of the report has been compromised.")
             conn.send((0).to_bytes(2, 'big', signed=False))
