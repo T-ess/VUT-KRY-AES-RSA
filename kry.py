@@ -186,7 +186,7 @@ elif args.s: ## Server
         checksum_rcv = checksum_rcv[len(checksum_rcv)-16:]
         data = checked_msg[:len(checked_msg)-256]
         checksum = hashlib.md5(data).digest()
-        print("\ns: plaintext={}".format(data))
+        print("\ns: plaintext={}".format(data.decode()))
         print("\ns: MD5={}".format(checksum))
         if checksum == checksum_rcv:
             print("\ns: The integrity of the message has not been compromised.")
